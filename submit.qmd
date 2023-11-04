@@ -1,28 +1,100 @@
 ---
-title: ""
-author: ""
+title: "Assignment 03 - Text Mining"
+author: "Jayson De La O"
 format:
   html:
     embed-resources: true
 ---
 
-## Quarto
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
 
 ```{r}
-1 + 1
+library(tidytext)
+library(readr)
+library(dplyr)
+library(data.table)
+library(ggplot2)
+library(magrittr)
+library(tidyverse)
+library(stringr)
 ```
 
-You can add options to executable code like this
 
 ```{r}
-#| echo: false
-2 * 2
+pub <- read_csv("https://raw.githubusercontent.com/USCbiostats/data-science-data/master/03_pubmed/pubmed.csv")
+pub<- pub %>%
+  select(abstract, term) 
+
+
+
+pub
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+```{r}
+#pub %>%
+ # count(term, sort = TRUE)
+```
+
+The most frequent words are mostly stop words, but there are a couple of words that suggest that the text might be medical-related. We see the word covid is a frequently used word. After removing the stop word, the words definitely  suggest the text is medical-related with words like patients,disease, treatment, and clinical. The 5 most common tokens for each search term after removing stopwords is in the 3rd table below.
+
+```{r}
+#1.Tokenize the abstracts and count the number of each token. Do you see #anything interesting? Does removing stop words change what tokens appear #as the most frequent? What are the 5 most common tokens for each search #term after removing stopwords?
+
+pub %>%
+  unnest_tokens(token, abstract) %>%
+  count(token, sort = TRUE)
+
+pub %>%
+  unnest_tokens(token, abstract) %>%
+  filter(!str_detect(token, "[0-9]")) %>%
+  anti_join(stop_words, by = c("token" = "word")) %>%
+  count(token, sort = TRUE)
+
+pub %>%
+   group_by(term) %>%
+  unnest_tokens(token, abstract) %>%
+  anti_join(stop_words, by = c("token" = "word")) %>%
+  count(token, sort = TRUE)%>%
+  top_n(5, n)
+```
+ 
+
+```{r}
+#2.Tokenize the abstracts into bigrams. Find the 10 most common bigrams and #visualize them with ggplot2.
+
+pub %>%
+  unnest_ngrams(ngram, abstract, n = 2)  %>%
+  anti_join(stop_words, by = c("ngram" = "word")) %>%
+  count(ngram, sort = TRUE)%>%
+  top_n(10, n)
+
+
+
+pub %>%
+  unnest_ngrams(ngram, abstract, n = 2)  %>%
+  anti_join(stop_words, by = c("ngram" = "word")) %>%
+  count(ngram, sort = TRUE)%>%
+  top_n(10, n) %>%
+  ggplot(aes(n, ngram)) +
+  geom_col()
+```
+
+The results from question 1 display the most frequently used words for each word-search term combination counting each individual word. The results of question 3 uses bind_tf_idf() which only uses the most frequently used terms by row. The top 5 tokens for each search term with the highest tf_IDF values are displayed in the second table below.
+```{r}
+#3.Calculate the TF-IDF value for each word-search term combination (here #you want the search term to be the “document”). What are the 5 tokens from #each search term with the highest TF-IDF value? How are the results #different from the answers you got in question 1?
+
+pub %>%
+  unnest_tokens(abstract, abstract) %>%
+  count(abstract, term) %>%
+  bind_tf_idf(abstract, term, n)%>%
+  arrange(desc(tf_idf))
+
+pub %>%
+   group_by(term) %>%
+  unnest_tokens(abstract, abstract) %>%
+  count(abstract, term) %>%
+  bind_tf_idf(abstract, term, n) %>%
+  arrange(desc(tf_idf))  %>%
+  top_n(5, tf_idf)
+
+```
